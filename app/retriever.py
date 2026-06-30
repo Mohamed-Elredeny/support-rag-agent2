@@ -96,8 +96,13 @@ def load_or_build_retriever(
     """Prefer the baked index; rebuild from the KB if it is missing or stale."""
     path = Path(index_path)
     if path.exists():
-        retriever = InMemoryRetriever.load(path)
-        if retriever.embed_model == embedder.model_name and len(retriever) == len(load_kb(kb_path)):
-            return retriever
-    retriever = InMemoryRetriever.from_kb(kb_path, embedder)
-    return retriever
+        try:
+            retriever = InMemoryRetriever.load(path)
+            if retriever.embed_model == embedder.model_name and len(retriever) == len(
+                load_kb(kb_path)
+            ):
+                return retriever
+        except (ValueError, OSError, KeyError):
+            # Corrupted or incompatible index — fall through and rebuild from the KB.
+            pass
+    return InMemoryRetriever.from_kb(kb_path, embedder)

@@ -162,10 +162,13 @@ class SupportAgent:
             return Decision.answer, entry.answer
 
         if self._settings.llm_grounding_guard:
-            head = raw[:40].upper()
-            if _GUARD_OUT_OF_SCOPE in head:
+            # The guard prompt tells the model to reply with EXACTLY one sentinel, so
+            # match the START of the stripped reply — never a mid-answer mention (a
+            # legitimate answer could contain the word "insufficient").
+            head = raw.strip().upper()
+            if head.startswith(_GUARD_OUT_OF_SCOPE):
                 return Decision.decline, DECLINE_MESSAGE
-            if _GUARD_INSUFFICIENT in head or not raw:
+            if head.startswith(_GUARD_INSUFFICIENT) or not raw.strip():
                 return (
                     Decision.decline,
                     "I don't have that information in my knowledge base. "
