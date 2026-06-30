@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-type-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Ruff (lint + format check)
+        run: |
+          ruff check app ingest eval tests
+          ruff format --check app ingest eval tests
+      - name: Mypy (type check)
+        run: mypy app ingest eval
+      - name: Pytest
+        run: pytest
+
+  docker-build-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t support-agent:ci .
+      - name: Offline model load (no network)
+        run: |
+          docker run --rm --network=none support-agent:ci \
+            python -c "from app.embeddings import Embedder; e=Embedder('BAAI/bge-small-en-v1.5','/opt/fastembed'); print('offline embed OK', e.embed_query('hi').shape)"
+      - name: Run container and smoke-test the API
+        run: |
+          docker run -d --name agent -p 8000:8000 support-agent:ci
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/healthz && break || sleep 1
+          done
+          echo "--- answer branch ---"
+          curl -sf http://127.0.0.1:8000/chat -H 'Content-Type: application/json' \
+            -d '{"question":"how do I reset my password"}' | tee /tmp/r.json
+          grep -q '"decision"' /tmp/r.json
+          echo "--- decline branch ---"
+          curl -sf http://127.0.0.1:8000/chat -H 'Content-Type: application/json' \
+            -d '{"question":"what is the weather today"}' | grep -q '"decision":"decline"'
+          docker rm -f agent
