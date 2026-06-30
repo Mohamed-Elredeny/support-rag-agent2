@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: support-agent
+  labels:
+    app.kubernetes.io/name: support-agent
+spec:
+  # Stateless (the KB index is baked into the image) => scale horizontally by replicas.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: support-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: support-agent
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: support-agent
+          image: support-agent:0.1.0
+          # kind/minikube load the image locally; never pull a :latest from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: support-config
+          # Liveness: process only — a dependency blip must not restart the pod.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          # Readiness: gates traffic on Ollama reachability.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # Startup: gives the ONNX model time to load before liveness kicks in.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "1"
+              memory: "768Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # readOnlyRootFilesystem=true => provide a writable scratch dir.
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: support-agent
+spec:
+  selector:
+    app.kubernetes.io/name: support-agent
+  ports:
+    - port: 80
+      targetPort: 8000

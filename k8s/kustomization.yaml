@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: support-agent
+
+resources:
+  - namespace.yaml
+  - ollama.yaml
+  - agent.yaml
+
+# Generates ConfigMap "support-config" with a content-hash suffix. Editing
+# config.env changes the hash, which rolls the agent Deployment automatically.
+configMapGenerator:
+  - name: support-config
+    envs:
+      - config.env
+
+# Single place to bump the image tag (kept in sync with `make build`).
+images:
+  - name: support-agent
+    newTag: "0.1.0"
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: support-rag-agent
+    includeSelectors: false
