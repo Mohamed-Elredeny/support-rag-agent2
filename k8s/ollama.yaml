@@ -35,17 +35,29 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              set -e
               /bin/ollama serve &
               pid=$!
-              echo "waiting for ollama to come up..."
-              until /bin/ollama list >/dev/null 2>&1; do sleep 1; done
+              echo "waiting for ollama daemon..."
+              for _ in $(seq 1 60); do
+                /bin/ollama list >/dev/null 2>&1 && break
+                sleep 2
+              done
               /bin/ollama pull "$MODEL"
-              kill "$pid"
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
           env:
             - name: OLLAMA_HOST
               value: "127.0.0.1:11434"
             - name: MODEL
               value: "qwen2.5:0.5b"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
           volumeMounts:
             - name: models
               mountPath: /root/.ollama
