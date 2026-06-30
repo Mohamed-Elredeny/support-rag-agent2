@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Support Assistant</title>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a212b; --muted:#8a97a8; --accent:#4f9cf9; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:#e6edf3; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 1.25rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
+    #log { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+    .msg { padding:10px 12px; border-radius:10px; max-width:85%; white-space:pre-wrap; }
+    .user { align-self:flex-end; background:var(--accent); color:#04101f; }
+    .bot { align-self:flex-start; background:var(--panel); }
+    .trace { font-size:.72rem; color:var(--muted); margin-top:6px; }
+    .badge { display:inline-block; padding:1px 7px; border-radius:99px; font-size:.7rem; font-weight:600; }
+    .answer { background:#1f6f3f; } .clarify { background:#8a6d1f; } .decline { background:#8a2f2f; }
+    form { display:flex; gap:8px; }
+    input { flex:1; padding:11px 12px; border-radius:10px; border:1px solid #2b3543; background:#0b0f14; color:#e6edf3; }
+    button { padding:0 18px; border:0; border-radius:10px; background:var(--accent); color:#04101f; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:default; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Agentic Support Assistant</h1>
+    <div class="sub">Ask about your account, billing, integrations, or data &amp; security. The agent will answer, ask a clarifying question, or decline.</div>
+    <div id="log"></div>
+    <form id="form">
+      <input id="q" autocomplete="off" placeholder="e.g. I forgot my login, how do I get back in?" />
+      <button id="send" type="submit">Send</button>
+    </form>
+  </div>
+  <script>
+    const log = document.getElementById("log");
+    const form = document.getElementById("form");
+    const input = document.getElementById("q");
+    const send = document.getElementById("send");
+
+    function add(text, who) {
+      const el = document.createElement("div");
+      el.className = "msg " + who;
+      el.textContent = text;
+      log.appendChild(el);
+      el.scrollIntoView();
+      return el;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
+      add(question, "user");
+      input.value = "";
+      send.disabled = true;
+      const thinking = add("…", "bot");
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        thinking.textContent = data.answer;
+        const trace = document.createElement("div");
+        trace.className = "trace";
+        const s = data.scores || {};
+        trace.innerHTML = `<span class="badge ${data.decision}">${data.decision}</span> ` +
+          `top1=${s.top1} margin=${s.margin} · source=${(data.sources[0]||{}).id || "—"} · ${data.latency_ms}ms`;
+        thinking.appendChild(trace);
+      } catch (err) {
+        thinking.textContent = "Request failed: " + err;
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
