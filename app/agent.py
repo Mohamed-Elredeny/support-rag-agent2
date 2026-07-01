@@ -75,7 +75,7 @@ def _clarify_message(hits: list[Hit]) -> str:
             break
     if len(cats) == 2:
         return (
-            f"I want to point you to the right answer — is your question about "
+            f"I want to point you to the right answer - is your question about "
             f"{cats[0]} or {cats[1]}? A little more detail will help."
         )
     return "Could you add a bit more detail so I can point you to the right answer?"
