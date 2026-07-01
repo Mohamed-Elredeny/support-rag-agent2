@@ -23,6 +23,7 @@ htmlcov/
 
 # Model / HF caches (must NOT be committed — pulled at build time)
 .cache/
+.fastembed_cache/
 *.onnx
 models/
 
