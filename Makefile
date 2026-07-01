@@ -49,6 +49,9 @@ fmt: ## Auto-format + autofix
 run: ## Run the API locally (needs Ollama at $$OLLAMA_BASE_URL)
 	uvicorn app.api:app --reload
 
+compose-up: ## Run the whole stack locally without Kubernetes (Ollama + model + agent)
+	docker compose up --build
+
 down: ## Delete the kind cluster
 	kind delete cluster --name $(CLUSTER)
 

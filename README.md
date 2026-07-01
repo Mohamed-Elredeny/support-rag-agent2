@@ -120,7 +120,15 @@ make down          # tear everything down
 into a PVC via an initContainer, the KB index is baked into the agent image, and
 nothing is seeded by hand.
 
-**Run locally without Kubernetes** (needs Ollama on `localhost:11434`):
+**Run locally without Kubernetes** — one command via Docker Compose (brings up
+Ollama, pulls the model, starts the agent):
+
+```bash
+make compose-up            # or: docker compose up --build
+# → open http://localhost:8000  (chat UI)
+```
+
+Or run just the API against a host Ollama:
 
 ```bash
 pip install -r requirements-dev.txt

@@ -1,0 +1,45 @@
+# Local one-command run WITHOUT Kubernetes (for a dev machine with enough RAM).
+# Brings up Ollama, pulls the model once, then starts the agent wired to it.
+#
+#   docker compose up --build
+#   # then open http://localhost:8000  (chat UI)  or:
+#   curl -s localhost:8000/chat -H 'Content-Type: application/json' \
+#        -d '{"question":"how do I reset my password?"}'
+#
+# Note: needs ~3-4 GB free for Ollama + qwen2.5:0.5b + the agent. On a small
+# machine, use the single-node Kubernetes path (`make deploy`) on a bigger host.
+
+services:
+  ollama:
+    image: ollama/ollama:0.5.7
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: waits for Ollama to be healthy, pulls the model, then exits.
+  model-pull:
+    image: ollama/ollama:0.5.7
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: "ollama:11434"
+    entrypoint: ["ollama", "pull", "qwen2.5:0.5b"]
+    restart: "no"
+
+  agent:
+    build: .
+    depends_on:
+      model-pull:
+        condition: service_completed_successfully
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+    ports:
+      - "8000:8000"
+
+volumes:
+  ollama-models:
