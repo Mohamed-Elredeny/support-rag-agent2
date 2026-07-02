@@ -5,8 +5,9 @@ metadata:
   labels:
     app.kubernetes.io/name: support-agent
 spec:
-  # Stateless (the KB index is baked into the image) => scale horizontally by replicas.
-  replicas: 2
+  # Stateless (the KB index is baked into the image) => scales horizontally by replicas.
+  # Default 1 so a single-node laptop cluster comes up reliably; bump for real load.
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: support-agent
@@ -30,6 +31,13 @@ spec:
           envFrom:
             - configMapRef:
                 name: support-config
+          # readOnlyRootFilesystem is on, so redirect any stray HF/tooling cache
+          # writes to the writable scratch mount instead of a read-only $HOME.
+          env:
+            - name: HOME
+              value: /tmp
+            - name: HF_HOME
+              value: /tmp/hf
           # Liveness: process only — a dependency blip must not restart the pod.
           livenessProbe:
             httpGet:
@@ -57,7 +65,9 @@ spec:
               memory: "512Mi"
             limits:
               cpu: "1"
-              memory: "1Gi"
+              # Headroom for the ONNX runtime loading bge-small; 1Gi risks an OOMKill
+              # during the model-load spike on first request.
+              memory: "1536Mi"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
