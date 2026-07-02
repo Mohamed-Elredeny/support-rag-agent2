@@ -188,12 +188,15 @@ def render_report(records: list[Record], settings: Settings) -> str:
         "2. **Near-but-out-of-scope queries** (e.g. *“write a SQL query…”*, medical advice) share "
         "vocabulary with the KB and exceed `t_low`, so a pure threshold under-declines them.",
         "",
-        "Both are inherent limits of *similarity-only* routing on a tiny corpus. The deployed "
-        "agent therefore adds a second stage: an **LLM grounding/scope guard** (deterministic at "
-        "temperature 0) that downgrades answer→decline for build/code and off-topic requests, "
-        "plus the **Q10 out-of-scope exemplar** for coding intents. This harness scores the "
-        "deterministic router *in isolation* on purpose — to make the calibration story honest "
-        "and to show exactly which cases motivate the guard.",
+        "Both are inherent limits of *similarity-only* routing on a tiny corpus. The primary "
+        "out-of-scope defenses are therefore DETERMINISTIC: the **Q10 out-of-scope exemplar** "
+        "(coding intents that land on it decline) and the **low-similarity floor** `t_low`. On "
+        "top, the answer path adds a best-effort **LLM grounding/scope guard** (deterministic at "
+        "temperature 0) that downgrades answer→decline for build/code requests — but at 0.5B its "
+        "reliability is limited (it catches e.g. *“write a Python script…”* and misses e.g. "
+        "*“write a SQL query…”*), so a code request in the ambiguous band degrades to a "
+        "clarifying question, never a wrong answer. This harness scores the deterministic router "
+        "*in isolation* on purpose — to keep the calibration story honest.",
         "",
     ]
     return "\n".join(lines) + "\n"

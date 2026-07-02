@@ -98,10 +98,15 @@ wrong answer is worse than an unnecessary clarification.
 | `t_margin` | **0.02** | min top-1/top-2 gap to answer vs clarify |
 
 **Out-of-scope is never string-matched against Q10.** It is derived from (1) low
-absolute similarity, (2) Q10 acting as a semantic *exemplar* (coding requests land
-near it), and (3) the LLM scope guard for the adversarial **Q7-vs-Q10** case
-("write code to call your API" lexically resembles the integrations entry but must
-be declined). A brand-new out-of-scope question therefore still declines.
+absolute similarity and (2) Q10 acting as a semantic *exemplar* (coding requests land
+near it) — both **deterministic**. A brand-new out-of-scope question therefore still
+declines. On top, (3) the answer path runs a **best-effort** LLM scope guard for the
+adversarial **Q7-vs-Q10** case ("write code to call your API" resembles the
+integrations entry). Honest caveat: at 0.5B this guard is unreliable — it catches some
+phrasings (*"write a Python script…"*) and misses others (*"write a SQL query…"*), so a
+code request that lands in the ambiguous band **degrades to a clarifying question, never
+a wrong answer**. A larger guard model (or a learned intent classifier — see Future work)
+makes it reliable; the deterministic layers (1)+(2) are the primary defense.
 
 ---
 
