@@ -35,9 +35,9 @@ class Embedder:
         self.model_name = model_name
         # cache_dir pins WHERE fastembed stores/loads the ONNX model. We set it
         # explicitly so the model can be baked into the image at a known path and
-        # loaded fully offline at runtime (HF_HUB_OFFLINE=1).
-        kwargs = {"cache_dir": cache_dir} if cache_dir else {}
-        self._model = TextEmbedding(model_name=model_name, **kwargs)
+        # loaded fully offline at runtime (HF_HUB_OFFLINE=1). None => fastembed's
+        # default cache location.
+        self._model = TextEmbedding(model_name=model_name, cache_dir=cache_dir)
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         """Embed KB passages (no instruction prefix). Returns (n, dim), normalized."""
