@@ -9,13 +9,17 @@ model. The LLM only phrases the answer, and is strictly grounded in the single
 retrieved entry. An optional LLM grounding/scope guard can only *downgrade*
 answer -> decline/clarify (fail-safe), never invent an answer.
 
-Out-of-scope is handled two ways, neither of which hardcodes Q10's text:
+Out-of-scope is handled by two DETERMINISTIC signals (neither hardcodes Q10's text),
+plus one best-effort LLM layer:
   1. Semantic: Q10 is embedded as an "Out of Scope" exemplar; a coding/off-topic
      query that lands on it routes to DECLINE.
   2. Low similarity: anything far from every entry (top1 < t_low) is declined.
-  3. Guard: on the answer path, the grounded prompt also tells the model to emit
-     OUT_OF_SCOPE for build/code requests (catches the adversarial Q7-vs-Q10 case
-     where "write code to call the API" lexically resembles the integrations entry).
+  3. Guard (best-effort): on the answer path, the grounded prompt also asks the model
+     to emit OUT_OF_SCOPE for build/code requests. This is a safety NET, not the
+     primary defense: at 0.5B the classifier is unreliable (it catches some phrasings,
+     e.g. "write a Python script...", and misses others, e.g. "write a SQL query...").
+     Code requests that land in the ambiguous CLARIFY band therefore degrade to a
+     clarifying question, never a wrong answer. A larger guard model closes this gap.
 """
 
 from __future__ import annotations
@@ -66,19 +70,25 @@ def route(top1: float, margin: float, top_is_out_of_scope: bool, settings: Setti
 
 
 def _clarify_message(hits: list[Hit]) -> str:
-    """Ask a targeted question naming the top-2 retrieved topics."""
-    cats: list[str] = []
-    for hit in hits:
-        if hit.entry.category not in cats and not hit.entry.is_out_of_scope:
-            cats.append(hit.entry.category)
-        if len(cats) == 2:
-            break
-    if len(cats) == 2:
+    """Ask a targeted question about the top-2 in-scope retrieved entries.
+
+    If the two best entries sit in different categories we name them. If they
+    share a category (e.g. refund vs cancel, both Billing), naming categories
+    would misdirect, so we acknowledge the shared area and ask for the goal.
+    """
+    scoped = [h.entry for h in hits if not h.entry.is_out_of_scope]
+    if len(scoped) < 2:
+        return "Could you add a bit more detail so I can point you to the right answer?"
+    first, second = scoped[0], scoped[1]
+    if first.category != second.category:
         return (
             f"I want to point you to the right answer - is your question about "
-            f"{cats[0]} or {cats[1]}? A little more detail will help."
+            f"{first.category} or {second.category}? A little more detail will help."
         )
-    return "Could you add a bit more detail so I can point you to the right answer?"
+    return (
+        f"Your question looks related to {first.category}, but it could mean a couple of "
+        f"different things - could you tell me a bit more about exactly what you need?"
+    )
 
 
 def _build_prompt(question: str, entry: KBEntry) -> str:
@@ -172,7 +182,7 @@ class SupportAgent:
                 return (
                     Decision.decline,
                     "I don't have that information in my knowledge base. "
-                    "Please contact support@test.com for help.",
+                    f"Please contact {self._settings.support_email} for help.",
                 )
 
         return Decision.answer, raw

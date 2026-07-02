@@ -28,7 +28,11 @@ class Settings(BaseSettings):
     llm_num_ctx: int = 2048
     llm_temperature: float = 0.0  # deterministic generation for a reproducible demo
     llm_seed: int = 0
-    llm_timeout_s: float = 30.0
+    # Sized for a cold start on a CPU-only laptop/cluster: the FIRST answer query
+    # loads the model into RAM (tens of seconds under memory pressure). Too tight a
+    # timeout would fail into the extractive fallback AND silently skip the scope
+    # guard, so keep generous headroom. Ollama has its own keep-alive after warm-up.
+    llm_timeout_s: float = 120.0
     # Use the LLM as a grounding/scope guard on the answer path. Deterministic at
     # temperature 0. The deterministic router decides the branch; this only ever
     # *downgrades* answer -> decline/clarify, never the reverse (fail-safe).
@@ -56,6 +60,9 @@ class Settings(BaseSettings):
 
     # --- Service ---
     log_level: str = "INFO"
+    # Support contact surfaced in fallback messages — config, not a code literal
+    # (mirrors the KB's support address; overridable per environment / Secret).
+    support_email: str = "support@test.com"
 
 
 @lru_cache
