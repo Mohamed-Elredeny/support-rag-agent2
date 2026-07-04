@@ -73,6 +73,24 @@ def update_ticket(
     return RedirectResponse(url=f"/admin/tickets/{ticket_id}", status_code=303)
 
 
+# ---- Chats ----
+
+
+@router.get("/chats", response_class=HTMLResponse)
+def chats(request: Request, ip: str | None = None) -> HTMLResponse:
+    return _TEMPLATES.TemplateResponse(
+        "admin/chats.html",
+        {
+            "request": request,
+            "active": "chats",
+            "messages": storage.list_messages(ip=ip),
+            "ips": storage.list_ips(),
+            "tickets": storage.ticket_by_message(),
+            "ip": ip,
+        },
+    )
+
+
 # ---- Knowledge base ----
 
 

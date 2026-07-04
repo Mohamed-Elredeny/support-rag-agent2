@@ -33,6 +33,7 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     channel: Mapped[str] = mapped_column(String(20), default="web")
+    ip: Mapped[str | None] = mapped_column(String(64), default=None)
     session_id: Mapped[str | None] = mapped_column(String(64), default=None)
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
@@ -61,6 +62,15 @@ class Ticket(Base):
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(_engine)
+    _migrate()
+
+
+def _migrate() -> None:
+    """Additive migrations for the local SQLite file (add new columns in place)."""
+    with _engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(messages)")}
+        if "ip" not in cols:
+            conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN ip VARCHAR(64)")
 
 
 def record_chat(
@@ -70,12 +80,14 @@ def record_chat(
     top1: float,
     *,
     channel: str = "web",
+    ip: str | None = None,
     session_id: str | None = None,
 ) -> int | None:
     """Log a turn and, on a decline, open a ticket. Returns the ticket id if one opened."""
     with _Session() as s:
         msg = Message(
             channel=channel,
+            ip=ip,
             session_id=session_id,
             question=question,
             answer=answer,
@@ -138,4 +150,35 @@ def dashboard_counts() -> dict[str, int]:
             )
             or 0,
             "tickets_total": s.scalar(select(func.count()).select_from(Ticket)) or 0,
+            "visitors": s.scalar(select(func.count(func.distinct(Message.ip)))) or 0,
         }
+
+
+def list_messages(ip: str | None = None, limit: int = 200) -> list[Message]:
+    with _Session() as s:
+        stmt = select(Message).order_by(Message.created_at.desc()).limit(limit)
+        if ip:
+            stmt = stmt.where(Message.ip == ip)
+        return list(s.scalars(stmt))
+
+
+def list_ips() -> list[tuple[str, int]]:
+    """Distinct visitor IPs with their message counts, busiest first."""
+    with _Session() as s:
+        rows = s.execute(
+            select(Message.ip, func.count())
+            .group_by(Message.ip)
+            .order_by(func.count().desc())
+        ).all()
+        return [(ip or "unknown", n) for ip, n in rows]
+
+
+def ticket_by_message() -> dict[int, tuple[int, str]]:
+    """Map message id -> (ticket id, ticket status), for the chats view."""
+    with _Session() as s:
+        rows = s.execute(
+            select(Ticket.message_id, Ticket.id, Ticket.status).where(
+                Ticket.message_id.is_not(None)
+            )
+        ).all()
+        return {mid: (tid, status) for mid, tid, status in rows}

@@ -79,6 +79,14 @@ app.add_middleware(CorrelationIdMiddleware)
 app.include_router(admin_router)
 
 
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, honoring a proxy's X-Forwarded-For if present."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @app.post("/chat", response_model=ChatResponse, tags=["agent"])
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     agent: SupportAgent = request.app.state.agent
@@ -90,6 +98,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
         response.decision.value,
         response.scores.top1,
         channel="web",
+        ip=_client_ip(request),
     )
     return response
 

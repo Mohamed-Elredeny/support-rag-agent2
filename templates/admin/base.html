@@ -41,6 +41,15 @@
              font-size: 12px; font-weight: 600; }
     .badge.open { color: var(--open); background: var(--open-bg); }
     .badge.closed { color: var(--closed); background: var(--closed-bg); }
+    .badge.answer { color: #047857; background: #d1fae5; }
+    .badge.clarify { color: #b45309; background: #fef3c7; }
+    .badge.decline { color: #b91c1c; background: #fee2e2; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+            background: var(--panel); font-size: 13px; color: var(--ink); }
+    .chip.on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
+    .chip .n { color: var(--muted); }
+    code.ip { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 13px; }
     .filters { margin-bottom: 14px; }
     .filters a { margin-right: 12px; color: var(--muted); }
     .filters a.on { color: var(--brand); font-weight: 600; }
@@ -75,6 +84,7 @@
       <div class="brand">🎧 Support Admin</div>
       <nav>
         <a href="/admin" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
+        <a href="/admin/chats" class="{{ 'active' if active == 'chats' else '' }}">Chats</a>
         <a href="/admin/tickets" class="{{ 'active' if active == 'tickets' else '' }}">Tickets</a>
         <a href="/admin/kb" class="{{ 'active' if active == 'kb' else '' }}">Knowledge Base</a>
       </nav>
