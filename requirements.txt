@@ -10,3 +10,4 @@ fastembed==0.8.0
 numpy==2.2.1
 structlog==24.4.0
 PyYAML==6.0.2
+SQLAlchemy==2.0.36

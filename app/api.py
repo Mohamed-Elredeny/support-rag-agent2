@@ -18,6 +18,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
+from app import storage
 from app.agent import SupportAgent
 from app.config import Settings, get_settings
 from app.embeddings import Embedder
@@ -47,6 +48,7 @@ def build_llm(settings: Settings) -> OllamaClient:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
+    storage.init_db()
 
     # Load everything ONCE per process (expensive: ONNX model + index build).
     embedder = Embedder(settings.embed_model, settings.embed_cache_dir)
@@ -79,7 +81,29 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     agent: SupportAgent = request.app.state.agent
     response = await agent.handle(req.question)
     request.app.state.metrics.record(response.decision, response.latency_ms)
+    storage.record_chat(
+        req.question,
+        response.answer,
+        response.decision.value,
+        response.scores.top1,
+        channel="web",
+    )
     return response
+
+
+@app.get("/tickets", tags=["support"])
+async def tickets(status: str | None = None) -> list[dict[str, object]]:
+    return [
+        {
+            "id": t.id,
+            "channel": t.channel,
+            "question": t.question,
+            "decision": t.decision,
+            "status": t.status,
+            "created_at": t.created_at.isoformat(),
+        }
+        for t in storage.list_tickets(status)
+    ]
 
 
 @app.get("/healthz", tags=["ops"])
