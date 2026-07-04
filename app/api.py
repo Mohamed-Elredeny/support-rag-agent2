@@ -19,6 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from app import storage
+from app.admin import router as admin_router
 from app.agent import SupportAgent
 from app.config import Settings, get_settings
 from app.embeddings import Embedder
@@ -74,6 +75,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(CorrelationIdMiddleware)
+app.include_router(admin_router)
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["agent"])
