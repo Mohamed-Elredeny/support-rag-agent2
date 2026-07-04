@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.settings = settings
     app.state.llm = llm
+    app.state.embedder = embedder
     app.state.metrics = Metrics()
     app.state.agent = SupportAgent(embedder, retriever, llm, settings)
     log.info("startup_complete", kb_size=len(retriever), embed_model=settings.embed_model)

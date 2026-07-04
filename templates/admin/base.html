@@ -58,6 +58,15 @@
     .actions { display: flex; gap: 10px; margin-top: 12px; }
     .muted { color: var(--muted); }
     .back { display: inline-block; margin-bottom: 14px; }
+    input[type=text] { width: 100%; padding: 9px 10px; border: 1px solid var(--line);
+                       border-radius: 8px; font: inherit; }
+    label { display: block; margin-bottom: 3px; color: var(--muted); font-size: 12px;
+            text-transform: uppercase; letter-spacing: .03em; }
+    .field { margin-bottom: 14px; }
+    .btn.danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+    .topbar { display: flex; justify-content: space-between; align-items: center;
+              margin-bottom: 20px; }
+    .topbar h1 { margin: 0; }
   </style>
 </head>
 <body>
@@ -67,6 +76,7 @@
       <nav>
         <a href="/admin" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
         <a href="/admin/tickets" class="{{ 'active' if active == 'tickets' else '' }}">Tickets</a>
+        <a href="/admin/kb" class="{{ 'active' if active == 'kb' else '' }}">Knowledge Base</a>
       </nav>
     </aside>
     <main class="content">
