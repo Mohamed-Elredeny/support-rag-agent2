@@ -10,7 +10,7 @@ authors = [{ name = "Mohamed Elredeny" }]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["app", "ingest", "tests"]
+src = ["app", "ingest", "eval", "tests"]
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, bugbear, comprehensions, pyupgrade, simplify

@@ -2,7 +2,7 @@ IMAGE   ?= support-agent:0.1.0
 CLUSTER ?= support
 NS      ?= support-agent
 
-.PHONY: help build cluster load deploy wait pf demo test lint fmt run down clean
+.PHONY: help build cluster load deploy wait pf demo eval test lint fmt run down clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -31,17 +31,20 @@ pf: ## Port-forward the agent to http://127.0.0.1:8080
 demo: ## Exercise all three branches (run `make pf` in another terminal first)
 	./scripts/demo.sh
 
+eval: ## Calibrate thresholds + write eval/results.md (real embeddings, no Ollama needed)
+	python -m eval.run_eval --calibrate
+
 test: ## Run the unit + contract tests
 	pytest
 
 lint: ## ruff lint + format check + mypy
-	ruff check app ingest tests
-	ruff format --check app ingest tests
-	mypy app ingest
+	ruff check app ingest eval tests
+	ruff format --check app ingest eval tests
+	mypy app ingest eval
 
 fmt: ## Auto-format + autofix
-	ruff format app ingest tests
-	ruff check --fix app ingest tests
+	ruff format app ingest eval tests
+	ruff check --fix app ingest eval tests
 
 run: ## Run the API locally (needs Ollama at $$OLLAMA_BASE_URL)
 	uvicorn app.api:app --reload
