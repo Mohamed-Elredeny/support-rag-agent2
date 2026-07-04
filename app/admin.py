@@ -16,9 +16,7 @@ from app import kb, storage
 from app.agent import SupportAgent
 from app.retriever import InMemoryRetriever
 
-_TEMPLATES = Jinja2Templates(
-    directory=str(Path(__file__).resolve().parent.parent / "templates")
-)
+_TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -100,9 +98,7 @@ def _rebuild_index(request: Request) -> None:
     embedder = request.app.state.embedder
     retriever = InMemoryRetriever.from_kb(settings.kb_path, embedder)
     retriever.save(settings.index_path)
-    request.app.state.agent = SupportAgent(
-        embedder, retriever, request.app.state.llm, settings
-    )
+    request.app.state.agent = SupportAgent(embedder, retriever, request.app.state.llm, settings)
 
 
 @router.get("/kb", response_class=HTMLResponse)

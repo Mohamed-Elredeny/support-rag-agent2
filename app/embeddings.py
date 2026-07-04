@@ -1,15 +1,8 @@
-"""Embedding model wrapper around fastembed (ONNX runtime, CPU-only).
+"""bge-small embeddings via fastembed (ONNX runtime, CPU-only).
 
-Why fastembed over sentence-transformers? fastembed runs bge-small-en-v1.5 via
-ONNX and never pulls the torch+CUDA tree (~0.5-2 GB saved in the image) — we run
-on CPU, so the GPU stack is dead weight.
-
-The single most important correctness detail for BGE models is the
-**query/document asymmetry**: queries must carry the instruction prefix
-("Represent this sentence for searching relevant passages:") while documents
-must NOT. fastembed handles this for us via `query_embed` vs `embed`; applying
-the prefix to documents would be a silent correctness bug. We L2-normalize on
-both sides so cosine similarity reduces to a dot product downstream.
+bge models are asymmetric: queries need an instruction prefix, documents don't.
+fastembed handles that split for us (`query_embed` vs `embed`). Vectors are
+L2-normalized on both sides so cosine similarity is just a dot product.
 """
 
 from __future__ import annotations
@@ -25,27 +18,20 @@ def _l2_normalize(matrix: np.ndarray) -> np.ndarray:
 
 
 class Embedder:
-    """Thin, typed wrapper. Loads the ONNX model once and reuses it."""
-
     def __init__(self, model_name: str, cache_dir: str | None = None) -> None:
-        # Imported lazily so the unit tests (router/API contract) don't need the
-        # ONNX runtime, and import time stays cheap.
+        # Imported lazily so the unit tests don't need the ONNX runtime.
         from fastembed import TextEmbedding
 
         self.model_name = model_name
-        # cache_dir pins WHERE fastembed stores/loads the ONNX model. We set it
-        # explicitly so the model can be baked into the image at a known path and
-        # loaded fully offline at runtime (HF_HUB_OFFLINE=1). None => fastembed's
-        # default cache location.
         self._model = TextEmbedding(model_name=model_name, cache_dir=cache_dir)
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
-        """Embed KB passages (no instruction prefix). Returns (n, dim), normalized."""
+        """Embed KB passages (no prefix). Returns an (n, dim) normalized matrix."""
         vectors = np.array(list(self._model.embed(texts)), dtype=np.float32)
         return _l2_normalize(vectors)
 
     def embed_query(self, text: str) -> np.ndarray:
-        """Embed a user query WITH the bge query-instruction prefix. Returns (dim,)."""
+        """Embed a user query with the bge query prefix. Returns a (dim,) vector."""
         vector = np.array(next(iter(self._model.query_embed([text]))), dtype=np.float32)
         query_vector: np.ndarray = _l2_normalize(vector[None, :])[0]
         return query_vector

@@ -1,14 +1,9 @@
-"""Build (or rebuild) the retrieval index from the knowledge base.
+"""Build the retrieval index from the knowledge base.
 
-Idempotent: it recomputes the whole (N, 384) matrix from `kb.json` and writes
-`data/index.npz`. Running it twice yields the same artifact — no append, no
-delete-then-insert window. It is invoked at Docker build time to *bake* the index
-into the image (fast, offline startup), and can also be run as a one-shot job:
+Recomputes the whole matrix from kb.json and writes data/index.npz. Run at Docker
+build time to bake the index into the image, or as a one-shot:
 
     python -m ingest.ingest --kb data/kb.json --index data/index.npz
-
-At larger scale this is exactly where the Kubernetes ingestion Job would upsert
-into Qdrant instead of writing a local file (see README "Scaling to production").
 """
 
 from __future__ import annotations

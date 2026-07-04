@@ -1,25 +1,9 @@
-"""The agentic state machine — the heart of the challenge.
+"""The agent: embed -> retrieve -> route -> {answer | clarify | decline}.
 
-Flow:  EMBED -> RETRIEVE -> ROUTE -> {ANSWER | CLARIFY | DECLINE} -> RESPOND
-
-The routing decision is made in *deterministic Python code* on two retrieval
-signals (top-1 similarity and the top-1/top-2 margin) BEFORE the LLM is ever
-called. That makes the decision testable, auditable, and reliable on a weak 0.5B
-model. The LLM only phrases the answer, and is strictly grounded in the single
-retrieved entry. An optional LLM grounding/scope guard can only *downgrade*
-answer -> decline/clarify (fail-safe), never invent an answer.
-
-Out-of-scope is handled by two DETERMINISTIC signals (neither hardcodes Q10's text),
-plus one best-effort LLM layer:
-  1. Semantic: Q10 is embedded as an "Out of Scope" exemplar; a coding/off-topic
-     query that lands on it routes to DECLINE.
-  2. Low similarity: anything far from every entry (top1 < t_low) is declined.
-  3. Guard (best-effort): on the answer path, the grounded prompt also asks the model
-     to emit OUT_OF_SCOPE for build/code requests. This is a safety NET, not the
-     primary defense: at 0.5B the classifier is unreliable (it catches some phrasings,
-     e.g. "write a Python script...", and misses others, e.g. "write a SQL query...").
-     Code requests that land in the ambiguous CLARIFY band therefore degrade to a
-     clarifying question, never a wrong answer. A larger guard model closes this gap.
+The route is decided in plain Python from two retrieval signals (top-1 similarity
+and the top-1/top-2 margin) before the LLM is called, so it's deterministic and
+testable. The LLM only phrases the answer and acts as a grounding/scope guard that
+can downgrade answer -> decline, never the other way (fail-safe).
 """
 
 from __future__ import annotations
@@ -33,7 +17,7 @@ from app.config import Settings
 from app.embeddings import Embedder
 from app.llm_client import OllamaClient, OllamaError
 from app.models import ChatResponse, Decision, Hit, KBEntry, Scores, Source
-from app.retriever import Retriever
+from app.retriever import InMemoryRetriever
 
 log = structlog.get_logger(__name__)
 
@@ -59,7 +43,7 @@ SYSTEM_PROMPT = (
 
 
 def route(top1: float, margin: float, top_is_out_of_scope: bool, settings: Settings) -> Decision:
-    """Pure routing policy — unit-tested in isolation on synthetic scores."""
+    """Pure routing policy — unit-tested on synthetic scores."""
     if top1 < settings.t_low:
         return Decision.decline
     if top_is_out_of_scope:
@@ -70,12 +54,8 @@ def route(top1: float, margin: float, top_is_out_of_scope: bool, settings: Setti
 
 
 def _clarify_message(hits: list[Hit]) -> str:
-    """Ask a targeted question about the top-2 in-scope retrieved entries.
-
-    If the two best entries sit in different categories we name them. If they
-    share a category (e.g. refund vs cancel, both Billing), naming categories
-    would misdirect, so we acknowledge the shared area and ask for the goal.
-    """
+    """Ask about the top-2 in-scope entries: name them if they differ in category;
+    if they share one (e.g. refund vs cancel), ask for the goal instead."""
     scoped = [h.entry for h in hits if not h.entry.is_out_of_scope]
     if len(scoped) < 2:
         return "Could you add a bit more detail so I can point you to the right answer?"
@@ -104,7 +84,7 @@ class SupportAgent:
     def __init__(
         self,
         embedder: Embedder,
-        retriever: Retriever,
+        retriever: InMemoryRetriever,
         llm: OllamaClient,
         settings: Settings,
     ) -> None:
@@ -116,7 +96,7 @@ class SupportAgent:
     async def handle(self, question: str) -> ChatResponse:
         started = time.perf_counter()
 
-        # Embedding is CPU-bound/blocking — keep it off the event loop.
+        # Embedding is blocking/CPU-bound — keep it off the event loop.
         query_vector = await run_in_threadpool(self._embedder.embed_query, question)
         hits = self._retriever.search(query_vector, self._settings.top_k)
 
@@ -161,20 +141,18 @@ class SupportAgent:
         )
 
     async def _answer(self, question: str, entry: KBEntry) -> tuple[Decision, str]:
-        """Grounded generation with an extractive fallback and an optional guard."""
+        """Grounded generation with an extractive fallback and an optional scope guard."""
         prompt = _build_prompt(question, entry)
         try:
             raw = await self._llm.generate(prompt, system=SYSTEM_PROMPT)
         except OllamaError:
-            # Resilience: never 500 the user. Return the KB answer verbatim
-            # (still fully grounded, just not paraphrased).
+            # Never 500 the user: return the KB answer verbatim (still grounded).
             log.warning("ollama_unavailable_extractive_fallback", entry_id=entry.id)
             return Decision.answer, entry.answer
 
         if self._settings.llm_grounding_guard:
-            # The guard prompt tells the model to reply with EXACTLY one sentinel, so
-            # match the START of the stripped reply — never a mid-answer mention (a
-            # legitimate answer could contain the word "insufficient").
+            # The guard replies with EXACTLY one sentinel, so match the START of the
+            # reply — a real answer might contain "insufficient" mid-sentence.
             head = raw.strip().upper()
             if head.startswith(_GUARD_OUT_OF_SCOPE):
                 return Decision.decline, DECLINE_MESSAGE

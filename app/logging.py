@@ -1,9 +1,5 @@
-"""Structured (JSON) logging + a correlation-id per request.
-
-Every log line is JSON with a `correlation_id`, so a single request can be traced
-end to end (embed -> retrieve -> route -> generate). This is cheap observability
-that signals engineering maturity in the demo.
-"""
+"""JSON logging with a per-request correlation id, so one request can be traced
+end to end (embed -> retrieve -> route -> generate)."""
 
 from __future__ import annotations
 

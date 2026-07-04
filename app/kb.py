@@ -17,7 +17,8 @@ def _path() -> Path:
 
 
 def load() -> list[dict[str, str]]:
-    return json.loads(_path().read_text(encoding="utf-8"))
+    data: list[dict[str, str]] = json.loads(_path().read_text(encoding="utf-8"))
+    return data
 
 
 def save(entries: list[dict[str, str]]) -> None:

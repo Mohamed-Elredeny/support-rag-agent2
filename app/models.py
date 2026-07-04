@@ -1,10 +1,4 @@
-"""API request/response schemas and the core domain types.
-
-The ChatResponse deliberately exposes the *decision trace* (chosen action,
-retrieved sources, similarity scores). This makes the agentic behaviour
-observable in the demo and the interview — you can SEE why it answered,
-clarified, or declined, instead of trusting a black box.
-"""
+"""Domain types and the API request/response schemas."""
 
 from __future__ import annotations
 
@@ -15,14 +9,9 @@ from pydantic import BaseModel, Field
 
 
 class Decision(str, Enum):
-    """The three agentic branches."""
-
     answer = "answer"
     clarify = "clarify"
     decline = "decline"
-
-
-# ---- Domain types (not serialized over the wire) ----
 
 
 @dataclass(frozen=True)
@@ -39,12 +28,7 @@ class KBEntry:
         return self.category == self.OUT_OF_SCOPE_CATEGORY
 
     def document_text(self) -> str:
-        """What we embed for retrieval: question + answer.
-
-        We embed both because a user query may paraphrase either the question
-        ("I forgot my login") or facts only present in the answer ("how long is
-        the reset link valid"). Embedding the answer too widens recall.
-        """
+        # Embed question + answer so a query can match either side.
         return f"{self.question}\n{self.answer}"
 
 
@@ -54,11 +38,8 @@ class Hit:
     score: float
 
 
-# ---- Wire schemas ----
-
-
 class ChatRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=2000, description="The user's support question.")
+    question: str = Field(min_length=1, max_length=2000)
 
 
 class Source(BaseModel):
@@ -68,9 +49,9 @@ class Source(BaseModel):
 
 
 class Scores(BaseModel):
-    top1: float = Field(description="Cosine similarity of the best-matching KB entry.")
-    top2: float | None = Field(default=None, description="Second-best similarity.")
-    margin: float | None = Field(default=None, description="top1 - top2; small => ambiguous.")
+    top1: float
+    top2: float | None = None
+    margin: float | None = None
 
 
 class ChatResponse(BaseModel):

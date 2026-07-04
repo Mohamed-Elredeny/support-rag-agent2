@@ -6,22 +6,22 @@ confidence), we open a ticket so a human can pick it up from the admin panel.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import DateTime, Float, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-DB_PATH = Path("data/app.db")
+from app.config import get_settings
 
-_engine = create_engine(
-    f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False}
-)
+DB_PATH = Path(get_settings().db_path)
+
+_engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 _Session = sessionmaker(bind=_engine, expire_on_commit=False)
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
@@ -54,9 +54,7 @@ class Ticket(Base):
     status: Mapped[str] = mapped_column(String(16), default="open")
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    resolved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 def init_db() -> None:
@@ -127,7 +125,9 @@ def get_ticket(ticket_id: int) -> Ticket | None:
         return s.get(Ticket, ticket_id)
 
 
-def update_ticket(ticket_id: int, *, status: str | None = None, note: str | None = None) -> Ticket | None:
+def update_ticket(
+    ticket_id: int, *, status: str | None = None, note: str | None = None
+) -> Ticket | None:
     with _Session() as s:
         ticket = s.get(Ticket, ticket_id)
         if ticket is None:
@@ -166,9 +166,7 @@ def list_ips() -> list[tuple[str, int]]:
     """Distinct visitor IPs with their message counts, busiest first."""
     with _Session() as s:
         rows = s.execute(
-            select(Message.ip, func.count())
-            .group_by(Message.ip)
-            .order_by(func.count().desc())
+            select(Message.ip, func.count()).group_by(Message.ip).order_by(func.count().desc())
         ).all()
         return [(ip or "unknown", n) for ip, n in rows]
 

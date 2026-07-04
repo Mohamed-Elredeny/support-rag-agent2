@@ -1,13 +1,4 @@
-"""Async client for the in-cluster Ollama LLM.
-
-Deliberate choices:
-- `num_ctx` is set EXPLICITLY. Ollama's default context is small (~2-4k depending
-  on the model/build) and it *silently truncates* the prompt — set it so the
-  retrieved KB entry is never dropped.
-- temperature 0 + a fixed seed => a reproducible demo (the grader sees the same
-  answer each run), and far less hallucination from a 0.5B model.
-- Bounded retries on *transient* failures only; a 4xx is a bug, not a blip.
-"""
+"""Async client for the Ollama LLM."""
 
 from __future__ import annotations
 
@@ -56,7 +47,7 @@ class OllamaClient:
                 resp.raise_for_status()
                 return str(resp.json().get("response", "")).strip()
             except httpx.HTTPStatusError as exc:
-                # Retry only server-side errors; client errors are deterministic bugs.
+                # Retry server errors only; a 4xx is a bug, not a transient blip.
                 if exc.response.status_code < 500 or attempt == self._max_retries:
                     raise OllamaError(f"Ollama returned {exc.response.status_code}") from exc
                 last_exc = exc

@@ -1,10 +1,7 @@
-"""Minimal in-process metrics in Prometheus text-exposition format.
+"""In-process metrics in Prometheus text format (no extra dependencies).
 
-Deliberately dependency-free (no prometheus_client) — for a single-replica-ish
-take-home this keeps the image lean while still exposing the signals that matter:
-request volume, the *distribution of agentic decisions*, and latency. Seeing the
-decision counter move proves the agent is actually branching, not always
-answering.
+Exposes request volume, the distribution of agentic decisions, and average
+latency — enough to see the agent actually branching across answer/clarify/decline.
 """
 
 from __future__ import annotations

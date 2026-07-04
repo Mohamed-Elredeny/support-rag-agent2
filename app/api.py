@@ -1,11 +1,8 @@
-"""FastAPI surface: /chat, /healthz, /readyz, /metrics, and a tiny chat UI.
+"""FastAPI surface: /chat, health probes, /metrics, the chat UI, and the admin panel.
 
-Probe discipline (a classic interview point):
-- /healthz (liveness): is the *process* alive? Never checks dependencies — a
-  dependency hiccup must not trigger a restart storm.
-- /readyz (readiness): are dependencies usable? Gates traffic. If Ollama is down
-  the pod is pulled from the Service; in-flight requests still degrade gracefully
-  via the extractive fallback in the agent.
+Probe split: /healthz is liveness (process only, never checks dependencies, so a
+dependency hiccup can't cause a restart storm); /readyz is readiness (gates traffic
+on Ollama being reachable).
 """
 
 from __future__ import annotations
@@ -51,7 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     storage.init_db()
 
-    # Load everything ONCE per process (expensive: ONNX model + index build).
+    # Load everything once per process (the ONNX model + index build are expensive).
     embedder = Embedder(settings.embed_model, settings.embed_cache_dir)
     retriever = load_or_build_retriever(settings.index_path, settings.kb_path, embedder)
     llm = build_llm(settings)
@@ -92,14 +89,18 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     agent: SupportAgent = request.app.state.agent
     response = await agent.handle(req.question)
     request.app.state.metrics.record(response.decision, response.latency_ms)
-    storage.record_chat(
-        req.question,
-        response.answer,
-        response.decision.value,
-        response.scores.top1,
-        channel="web",
-        ip=_client_ip(request),
-    )
+    # Logging is best-effort: a storage hiccup must never break the reply.
+    try:
+        storage.record_chat(
+            req.question,
+            response.answer,
+            response.decision.value,
+            response.scores.top1,
+            channel="web",
+            ip=_client_ip(request),
+        )
+    except Exception:  # noqa: BLE001 - logging must not fail the request
+        log.warning("chat_log_failed", exc_info=True)
     return response
 
 
@@ -120,7 +121,7 @@ async def tickets(status: str | None = None) -> list[dict[str, object]]:
 
 @app.get("/healthz", tags=["ops"])
 async def healthz() -> dict[str, str]:
-    """Liveness: process is up. No dependency checks by design."""
+    """Liveness: the process is up. No dependency checks by design."""
     return {"status": "ok"}
 
 
@@ -129,9 +130,8 @@ async def readyz(request: Request) -> PlainTextResponse:
     """Readiness: the index is loaded and Ollama is reachable."""
     llm: OllamaClient = request.app.state.llm
     ollama_ok = await llm.is_healthy()
-    ready = ollama_ok  # the in-memory index is always present once startup succeeds
     body = f"index=ok ollama={'ok' if ollama_ok else 'down'}"
-    return PlainTextResponse(body, status_code=200 if ready else 503)
+    return PlainTextResponse(body, status_code=200 if ollama_ok else 503)
 
 
 @app.get("/metrics", tags=["ops"])
