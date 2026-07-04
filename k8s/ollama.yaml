@@ -16,6 +16,9 @@ metadata:
     app.kubernetes.io/name: ollama
 spec:
   replicas: 1
+  # First deploy pulls the ~1.6 GB Ollama image + the model into the PVC; give the
+  # rollout headroom past the default 600s so a slow link doesn't trip a false failure.
+  progressDeadlineSeconds: 1200
   # Single RWO PVC => never run two writers at once.
   strategy:
     type: Recreate
@@ -27,6 +30,12 @@ spec:
       labels:
         app.kubernetes.io/name: ollama
     spec:
+      # Ollama runs as root and writes the model cache to /root/.ollama, so it can't
+      # take the agent's full hardening (nonroot + readOnlyRootFS). Apply at least the
+      # default seccomp profile so it isn't running Unconfined.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       # The model is pulled declaratively into the PVC before the server starts,
       # so a fresh cluster self-provisions and restarts never re-download.
       initContainers:

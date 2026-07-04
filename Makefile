@@ -22,7 +22,7 @@ deploy: cluster load ## One-command bring-up: cluster + image + manifests
 	@$(MAKE) wait
 
 wait: ## Wait for Ollama (pulls model) + agent to be ready
-	kubectl -n $(NS) rollout status deploy/ollama --timeout=600s
+	kubectl -n $(NS) rollout status deploy/ollama --timeout=1200s
 	kubectl -n $(NS) rollout status deploy/support-agent --timeout=300s
 
 pf: ## Port-forward the agent to http://127.0.0.1:8080
