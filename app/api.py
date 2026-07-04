@@ -1,4 +1,4 @@
-"""FastAPI surface: /chat, health probes, /metrics, the chat UI, and the admin panel.
+"""FastAPI surface: /chat, health probes, /metrics, and the chat UI.
 
 Probe split: /healthz is liveness (process only, never checks dependencies, so a
 dependency hiccup can't cause a restart storm); /readyz is readiness (gates traffic
@@ -15,8 +15,6 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from app import storage
-from app.admin import router as admin_router
 from app.agent import SupportAgent
 from app.config import Settings, get_settings
 from app.embeddings import Embedder
@@ -46,16 +44,13 @@ def build_llm(settings: Settings) -> OllamaClient:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
-    storage.init_db()
 
     # Load everything once per process (the ONNX model + index build are expensive).
     embedder = Embedder(settings.embed_model, settings.embed_cache_dir)
     retriever = load_or_build_retriever(settings.index_path, settings.kb_path, embedder)
     llm = build_llm(settings)
 
-    app.state.settings = settings
     app.state.llm = llm
-    app.state.embedder = embedder
     app.state.metrics = Metrics()
     app.state.agent = SupportAgent(embedder, retriever, llm, settings)
     log.info("startup_complete", kb_size=len(retriever), embed_model=settings.embed_model)
@@ -73,15 +68,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(CorrelationIdMiddleware)
-app.include_router(admin_router)
-
-
-def _client_ip(request: Request) -> str:
-    """Best-effort client IP, honoring a proxy's X-Forwarded-For if present."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["agent"])
@@ -89,34 +75,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     agent: SupportAgent = request.app.state.agent
     response = await agent.handle(req.question)
     request.app.state.metrics.record(response.decision, response.latency_ms)
-    # Logging is best-effort: a storage hiccup must never break the reply.
-    try:
-        storage.record_chat(
-            req.question,
-            response.answer,
-            response.decision.value,
-            response.scores.top1,
-            channel="web",
-            ip=_client_ip(request),
-        )
-    except Exception:  # noqa: BLE001 - logging must not fail the request
-        log.warning("chat_log_failed", exc_info=True)
     return response
-
-
-@app.get("/tickets", tags=["support"])
-async def tickets(status: str | None = None) -> list[dict[str, object]]:
-    return [
-        {
-            "id": t.id,
-            "channel": t.channel,
-            "question": t.question,
-            "decision": t.decision,
-            "status": t.status,
-            "created_at": t.created_at.isoformat(),
-        }
-        for t in storage.list_tickets(status)
-    ]
 
 
 @app.get("/healthz", tags=["ops"])
