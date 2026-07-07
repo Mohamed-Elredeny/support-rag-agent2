@@ -46,6 +46,7 @@ COPY --from=builder /build/data/index.npz ./data/index.npz
 COPY app ./app
 COPY data/kb.json ./data/kb.json
 COPY static ./static
+COPY templates ./templates
 
 # Run as a non-root numeric user; the model cache must be readable by it.
 RUN useradd --uid 10001 --create-home appuser \

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     t_low: float = 0.56  # decline if top1 < t_low
     t_margin: float = 0.02  # and require this top1-top2 gap to answer instead of clarify
 
+    # Storage
+    db_path: str = "data/app.db"
+
     # Service
     log_level: str = "INFO"
     support_email: str = "support@test.com"
