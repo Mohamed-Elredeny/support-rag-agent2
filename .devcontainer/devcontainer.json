@@ -2,7 +2,7 @@
   "name": "support-rag-agent",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:4.0.0": {}
   },
   "forwardPorts": [8000],
   "portsAttributes": {
