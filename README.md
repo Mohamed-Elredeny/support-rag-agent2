@@ -93,7 +93,10 @@ router but is caught by the LLM scope guard — see the [eval report](eval/resul
 
 Those thresholds aren't guessed — they're grid-searched on a labeled probe set
 ([`eval/golden.yaml`](eval/golden.yaml)) to maximise routing accuracy, breaking ties
-against the costliest mistake (a confident *wrong* answer). The harness runs the real
+against the costliest mistake (a confident *wrong* answer). To avoid quoting an
+in-sample number, the harness reports accuracy under **stratified 5-fold
+cross-validation** (thresholds calibrated on each train split, scored on the held-out
+fold), alongside the in-sample figure so the optimism gap is visible. It runs the real
 embedder + the deterministic router, no Ollama needed:
 
 ```bash
@@ -104,9 +107,10 @@ Headline numbers ([full report](eval/results.md)):
 
 - Retrieval over paraphrases: **recall@1 100%**, **MRR 1.00** — trivial at N=10, so the
   real problem here is calibration, not recall.
-- Routing accuracy: **83%** across answer / clarify / decline probes. The residual
-  misroutes are ambiguous-but-confident and near-scope queries — inherent limits of
-  similarity-only routing on a tiny corpus, analysed honestly in the report.
+- Routing accuracy: **80% cross-validated** (83% in-sample) across answer / clarify /
+  decline probes. The residual misroutes are ambiguous-but-confident and near-scope
+  queries — inherent limits of similarity-only routing on a tiny corpus, analysed
+  honestly in the report.
 
 ## Run it locally
 
