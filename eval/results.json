@@ -1,0 +1,168 @@
+{
+  "embed_model": "BAAI/bge-small-en-v1.5",
+  "top_k": 3,
+  "retrieval": {
+    "n": 21,
+    "recall@1": 1.0,
+    "recall@3": 1.0,
+    "MRR": 1.0
+  },
+  "routing": {
+    "cv": {
+      "folds": 5,
+      "n": 35,
+      "accuracy": 0.8,
+      "confusion": [
+        {
+          "expected": "answer",
+          "answer": 21,
+          "clarify": 0,
+          "decline": 0,
+          "total": 21,
+          "recall": 1.0
+        },
+        {
+          "expected": "clarify",
+          "answer": 4,
+          "clarify": 3,
+          "decline": 0,
+          "total": 7,
+          "recall": 0.42857142857142855
+        },
+        {
+          "expected": "decline",
+          "answer": 1,
+          "clarify": 2,
+          "decline": 4,
+          "total": 7,
+          "recall": 0.5714285714285714
+        }
+      ]
+    },
+    "in_sample": {
+      "label": "grid-searched, refit on all data",
+      "accuracy": 0.8285714285714286,
+      "confusion": [
+        {
+          "expected": "answer",
+          "answer": 21,
+          "clarify": 0,
+          "decline": 0,
+          "total": 21,
+          "recall": 1.0
+        },
+        {
+          "expected": "clarify",
+          "answer": 4,
+          "clarify": 3,
+          "decline": 0,
+          "total": 7,
+          "recall": 0.42857142857142855
+        },
+        {
+          "expected": "decline",
+          "answer": 1,
+          "clarify": 1,
+          "decline": 5,
+          "total": 7,
+          "recall": 0.7142857142857143
+        }
+      ],
+      "thresholds": {
+        "t_high": 0.59,
+        "t_low": 0.56,
+        "t_margin": 0.02
+      }
+    }
+  },
+  "fold_thresholds": [
+    {
+      "fold": 1,
+      "t_high": 0.59,
+      "t_low": 0.56,
+      "t_margin": 0.02
+    },
+    {
+      "fold": 2,
+      "t_high": 0.59,
+      "t_low": 0.56,
+      "t_margin": 0.02
+    },
+    {
+      "fold": 3,
+      "t_high": 0.59,
+      "t_low": 0.56,
+      "t_margin": 0.02
+    },
+    {
+      "fold": 4,
+      "t_high": 0.55,
+      "t_low": 0.48,
+      "t_margin": 0.02
+    },
+    {
+      "fold": 5,
+      "t_high": 0.59,
+      "t_low": 0.56,
+      "t_margin": 0.02
+    }
+  ],
+  "misroutes": [
+    {
+      "query": "I'm having trouble with my account.",
+      "expected": "clarify",
+      "predicted": "answer",
+      "top1": 0.7075,
+      "margin": 0.0822,
+      "top_id": "Q3"
+    },
+    {
+      "query": "My payment isn't working.",
+      "expected": "clarify",
+      "predicted": "answer",
+      "top1": 0.7031,
+      "margin": 0.0619,
+      "top_id": "Q3"
+    },
+    {
+      "query": "Where is my data?",
+      "expected": "clarify",
+      "predicted": "answer",
+      "top1": 0.7373,
+      "margin": 0.0773,
+      "top_id": "Q8"
+    },
+    {
+      "query": "I want to leave the service — what happens to my data?",
+      "expected": "clarify",
+      "predicted": "answer",
+      "top1": 0.702,
+      "margin": 0.0567,
+      "top_id": "Q6"
+    },
+    {
+      "query": "Write me a Python script that calls your REST API and posts to Slack.",
+      "expected": "decline",
+      "predicted": "answer",
+      "top1": 0.7105,
+      "margin": 0.0766,
+      "top_id": "Q7"
+    },
+    {
+      "query": "Can you give me medical advice about my symptoms?",
+      "expected": "decline",
+      "predicted": "clarify",
+      "top1": 0.5432,
+      "margin": 0.0163,
+      "top_id": "Q3"
+    },
+    {
+      "query": "Write a SQL query to migrate my database.",
+      "expected": "decline",
+      "predicted": "clarify",
+      "top1": 0.6007,
+      "margin": 0.0075,
+      "top_id": "Q9"
+    }
+  ]
+}

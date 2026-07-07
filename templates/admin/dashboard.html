@@ -10,6 +10,31 @@
   <div class="card"><div class="num">{{ counts.visitors }}</div><div class="label">Unique visitors</div></div>
 </div>
 
+{% if eval %}
+<div class="topbar" style="margin-top:32px">
+  <h2 style="margin:0">Model evaluation</h2>
+  <a class="btn" href="/admin/eval">View full report →</a>
+</div>
+<div class="cards">
+  <div class="card hero">
+    <div class="big pct">{{ '%.0f'|format(eval.routing.cv.accuracy * 100) }}%</div>
+    <div class="label">Routing accuracy</div>
+    <div class="bar"><i style="width: {{ (eval.routing.cv.accuracy * 100) | round(1) }}%"></i></div>
+    <div class="sub">cross-validated · {{ eval.routing.cv.folds }}-fold</div>
+  </div>
+  <div class="card">
+    <div class="big pct">{{ '%.0f'|format(eval.retrieval['recall@1'] * 100) }}%</div>
+    <div class="label">Retrieval recall@1</div>
+    <div class="sub">MRR {{ '%.2f'|format(eval.retrieval.MRR) }}</div>
+  </div>
+  <div class="card">
+    <div class="big pct">{{ eval.misroutes | length }}</div>
+    <div class="label">Misroutes</div>
+    <div class="sub">of {{ eval.routing.cv.n }} probe queries</div>
+  </div>
+</div>
+{% endif %}
+
 <h2>Recent tickets</h2>
 {% if recent %}
 <table>

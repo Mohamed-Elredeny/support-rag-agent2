@@ -57,13 +57,13 @@ Confusion matrix (rows = expected, cols = predicted):
 
 | query | expected | predicted | top1 | margin | top_id |
 |---|---|---|---|---|---|
-| I'm having trouble with my account. | clarify | answer | 0.7076 | 0.0823 | Q3 |
-| My payment isn't working. | clarify | answer | 0.7032 | 0.0621 | Q3 |
+| I'm having trouble with my account. | clarify | answer | 0.7075 | 0.0822 | Q3 |
+| My payment isn't working. | clarify | answer | 0.7031 | 0.0619 | Q3 |
 | Where is my data? | clarify | answer | 0.7373 | 0.0773 | Q8 |
-| I want to leave the service — what happens to my data? | clarify | answer | 0.7019 | 0.0566 | Q6 |
+| I want to leave the service — what happens to my data? | clarify | answer | 0.702 | 0.0567 | Q6 |
 | Write me a Python script that calls your REST API and posts to Slack. | decline | answer | 0.7105 | 0.0766 | Q7 |
-| Can you give me medical advice about my symptoms? | decline | clarify | 0.5433 | 0.0165 | Q3 |
-| Write a SQL query to migrate my database. | decline | clarify | 0.6007 | 0.0076 | Q9 |
+| Can you give me medical advice about my symptoms? | decline | clarify | 0.5432 | 0.0163 | Q3 |
+| Write a SQL query to migrate my database. | decline | clarify | 0.6007 | 0.0075 | Q9 |
 
 ### Why the residual errors are expected (and how the system handles them)
 

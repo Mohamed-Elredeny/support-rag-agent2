@@ -22,6 +22,7 @@ Writes a Markdown report to eval/results.md.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -296,6 +297,82 @@ def render_report(
     return "\n".join(lines) + "\n"
 
 
+def _matrix_rows(matrix: dict[str, dict[str, int]]) -> list[dict[str, object]]:
+    """Confusion matrix as JSON-friendly rows, each carrying its per-branch recall."""
+    rows: list[dict[str, object]] = []
+    for b in BRANCHES:
+        row = matrix[b.value]
+        total = sum(row.values())
+        rows.append(
+            {
+                "expected": b.value,
+                "answer": row["answer"],
+                "clarify": row["clarify"],
+                "decline": row["decline"],
+                "total": total,
+                "recall": (row[b.value] / total) if total else 0.0,
+            }
+        )
+    return rows
+
+
+def results_dict(
+    records: list[Record],
+    shipped: Settings,
+    shipped_label: str,
+    cv_preds: list[Decision],
+    fold_settings: list[Settings],
+    k: int,
+) -> dict[str, object]:
+    """Structured mirror of the Markdown report — same numbers, machine-readable.
+
+    Consumed by the admin dashboard's Evaluation page so the UI never re-runs the
+    harness; both outputs derive from the identical (records, cv_preds, shipped)."""
+    cv_matrix = confusion(records, cv_preds)
+    in_preds = _predictions(records, shipped)
+    in_matrix = confusion(records, in_preds)
+    misroutes = [
+        {
+            "query": r.query,
+            "expected": r.expected_decision,
+            "predicted": p.value,
+            "top1": r.top1,
+            "margin": r.margin,
+            "top_id": r.top_id,
+        }
+        for r, p in zip(records, cv_preds, strict=True)
+        if p.value != r.expected_decision
+    ]
+    return {
+        "embed_model": shipped.embed_model,
+        "top_k": shipped.top_k,
+        "retrieval": retrieval_metrics(records),
+        "routing": {
+            "cv": {
+                "folds": k,
+                "n": len(records),
+                "accuracy": accuracy(records, cv_preds),
+                "confusion": _matrix_rows(cv_matrix),
+            },
+            "in_sample": {
+                "label": shipped_label,
+                "accuracy": accuracy(records, in_preds),
+                "confusion": _matrix_rows(in_matrix),
+                "thresholds": {
+                    "t_high": shipped.t_high,
+                    "t_low": shipped.t_low,
+                    "t_margin": shipped.t_margin,
+                },
+            },
+        },
+        "fold_thresholds": [
+            {"fold": i + 1, "t_high": s.t_high, "t_low": s.t_low, "t_margin": s.t_margin}
+            for i, s in enumerate(fold_settings)
+        ],
+        "misroutes": misroutes,
+    }
+
+
 def main() -> None:
     # Windows terminals default to cp1252; the report contains arrows/curly quotes.
     if hasattr(sys.stdout, "reconfigure"):
@@ -305,6 +382,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--golden", default="eval/golden.yaml")
     parser.add_argument("--out", default="eval/results.md")
+    parser.add_argument("--json", default="eval/results.json", help="structured report for the UI")
     parser.add_argument("--calibrate", action="store_true", help="grid-search the thresholds")
     parser.add_argument("--folds", type=int, default=5, help="k for cross-validation")
     args = parser.parse_args()
@@ -332,7 +410,12 @@ def main() -> None:
 
     report = render_report(records, shipped, shipped_label, cv_preds, fold_settings, args.folds)
     Path(args.out).write_text(report, encoding="utf-8")
+
+    data = results_dict(records, shipped, shipped_label, cv_preds, fold_settings, args.folds)
+    Path(args.json).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
     print(report)
+    print(f"Wrote {args.out} and {args.json}")
 
 
 if __name__ == "__main__":

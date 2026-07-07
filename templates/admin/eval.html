@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+{% block title %}Evaluation{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h1>Evaluation</h1>
+  {% if data %}<span class="chip"><span class="muted">model</span>&nbsp;<b class="mono">{{ data.embed_model }}</b> · top_k {{ data.top_k }}</span>{% endif %}
+</div>
+
+{% if not data %}
+  <div class="panel">
+    <p>No evaluation report found yet.</p>
+    <p class="muted">Generate it with <code class="ip">make eval</code> (or <code class="ip">python -m eval.run_eval --calibrate</code>) — it runs the real embedder + the deterministic router, no Ollama needed, and writes <code class="ip">eval/results.json</code>.</p>
+  </div>
+{% else %}
+  {% set cv = data.routing.cv %}
+  {% set ins = data.routing.in_sample %}
+  {% set cols = ['answer', 'clarify', 'decline'] %}
+  {% set clarify_recall = (cv.confusion | selectattr('expected', 'equalto', 'clarify') | first).recall %}
+  {% set decline_recall = (cv.confusion | selectattr('expected', 'equalto', 'decline') | first).recall %}
+
+  <!-- honest verdict -->
+  <div class="verdict good">
+    <h3>Are these results good or bad? <span class="tag">Honest read</span></h3>
+    <p><b>Solid methodology, moderate accuracy, one known &amp; bounded weakness.</b> The headline is the
+      <span class="good-txt">{{ '%.0f'|format(cv.accuracy * 100) }}% cross-validated</span> routing accuracy —
+      the honest out-of-sample number (every query scored by thresholds it never influenced), not the flattering
+      {{ '%.0f'|format(ins.accuracy * 100) }}% in-sample figure.</p>
+    <ul>
+      <li><span class="good-txt">Retrieval is perfect but not the real test.</span> recall@1 100% / MRR 1.00 is
+        expected over just 10 KB entries — almost any embedder would score this. The hard problem is knowing when
+        <em>not</em> to answer.</li>
+      <li><span class="good-txt">The costliest error is controlled.</span> Answerable queries are never missed
+        (answer recall 100%), and only a single <em>decline→answer</em> slips through the router in isolation —
+        a code request that the runtime LLM scope-guard catches before replying.</li>
+      <li><span class="warn-txt">The real weakness: it over-answers ambiguous / near-scope queries.</span>
+        Under CV, clarify recall is {{ '%.0f'|format(clarify_recall * 100) }}% and decline recall
+        {{ '%.0f'|format(decline_recall * 100) }}%. Cosine similarity alone can't tell “Where is my data?”
+        (storage vs export) apart, so it answers instead of clarifying. Fixing this needs an intent/ambiguity
+        signal beyond similarity — documented as future work.</li>
+    </ul>
+  </div>
+
+  <!-- headline metrics -->
+  <div class="cards">
+    <div class="card hero">
+      <div class="big pct">{{ '%.0f'|format(cv.accuracy * 100) }}%</div>
+      <div class="label">Routing accuracy</div>
+      <div class="bar"><i style="width: {{ (cv.accuracy * 100) | round(1) }}%"></i></div>
+      <div class="sub">cross-validated · {{ cv.folds }}-fold · {{ cv.n }} queries</div>
+    </div>
+    <div class="card">
+      <div class="big pct">{{ '%.0f'|format(data.retrieval['recall@1'] * 100) }}%</div>
+      <div class="label">Retrieval recall@1</div>
+      <div class="sub">over {{ data.retrieval.n }} paraphrases</div>
+    </div>
+    <div class="card">
+      <div class="big pct">{{ '%.2f'|format(data.retrieval.MRR) }}</div>
+      <div class="label">Mean reciprocal rank</div>
+      <div class="sub">perfect ranking = 1.00</div>
+    </div>
+    <div class="card">
+      <div class="big pct">{{ '%.0f'|format(ins.accuracy * 100) }}%</div>
+      <div class="label">Routing (in-sample)</div>
+      <div class="sub">optimistic reference · {{ ins.label }}</div>
+    </div>
+  </div>
+
+  <!-- evidence: CV confusion matrix -->
+  <h2>Evidence · cross-validated confusion matrix</h2>
+  <p class="section-note">Rows = what the query <em>should</em> get, columns = what the router predicted. The green
+    diagonal is correct; red cells are misroutes. This is the evidence behind the {{ '%.0f'|format(cv.accuracy * 100) }}%.</p>
+  <table class="cm">
+    <thead><tr><th>expected ↓ predicted</th>{% for c in cols %}<th style="text-align:center">{{ c }}</th>{% endfor %}<th style="text-align:center">recall</th></tr></thead>
+    <tbody>
+      {% for r in cv.confusion %}
+      <tr>
+        <td><span class="badge {{ r.expected }}">{{ r.expected }}</span></td>
+        {% for c in cols %}
+          <td class="num {% if c == r.expected %}diag{% elif r[c] > 0 %}err{% else %}zero{% endif %}">{{ r[c] }}</td>
+        {% endfor %}
+        <td class="num"><span class="pct">{{ '%.0f'|format(r.recall * 100) }}%</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- evidence: threshold stability -->
+  <h2>Evidence · threshold stability across folds</h2>
+  <p class="section-note">Near-identical thresholds across folds ⇒ the calibration is robust, not an artefact of one
+    particular split. Wide swings would be an honest signal the set is too small.</p>
+  <table>
+    <thead><tr><th>fold</th><th>t_high</th><th>t_low</th><th>t_margin</th></tr></thead>
+    <tbody>
+      {% for f in data.fold_thresholds %}
+      <tr><td>{{ f.fold }}</td><td class="mono">{{ f.t_high }}</td><td class="mono">{{ f.t_low }}</td><td class="mono">{{ f.t_margin }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- evidence: in-sample matrix -->
+  <h2>At shipped thresholds <span class="muted" style="font-weight:500">(in-sample reference)</span></h2>
+  <p class="section-note">Shipped: <span class="mono">t_high={{ ins.thresholds.t_high }}, t_low={{ ins.thresholds.t_low }}, t_margin={{ ins.thresholds.t_margin }}</span>.
+    The gap between this {{ '%.0f'|format(ins.accuracy * 100) }}% and the {{ '%.0f'|format(cv.accuracy * 100) }}% above is exactly the calibration's optimism.</p>
+  <table class="cm">
+    <thead><tr><th>expected ↓ predicted</th>{% for c in cols %}<th style="text-align:center">{{ c }}</th>{% endfor %}<th style="text-align:center">recall</th></tr></thead>
+    <tbody>
+      {% for r in ins.confusion %}
+      <tr>
+        <td><span class="badge {{ r.expected }}">{{ r.expected }}</span></td>
+        {% for c in cols %}
+          <td class="num {% if c == r.expected %}diag{% elif r[c] > 0 %}err{% else %}zero{% endif %}">{{ r[c] }}</td>
+        {% endfor %}
+        <td class="num"><span class="pct">{{ '%.0f'|format(r.recall * 100) }}%</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- evidence: misroutes -->
+  <h2>Evidence · misroutes (cross-validated)</h2>
+  <p class="section-note">Every query the router got wrong, with the retrieval signals that fooled it — the honest error analysis.</p>
+  {% if data.misroutes %}
+  <table>
+    <thead><tr><th>query</th><th>expected</th><th>predicted</th><th>top-1</th><th>margin</th><th>top id</th></tr></thead>
+    <tbody>
+      {% for m in data.misroutes %}
+      <tr>
+        <td>{{ m.query }}</td>
+        <td><span class="badge {{ m.expected }}">{{ m.expected }}</span></td>
+        <td><span class="badge {{ m.predicted }}">{{ m.predicted }}</span></td>
+        <td class="mono">{{ '%.4f'|format(m.top1) }}</td>
+        <td class="mono">{{ '%.4f'|format(m.margin) }}</td>
+        <td class="mono">{{ m.top_id }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No misroutes on this set.</p>
+  {% endif %}
+
+  <p class="section-note" style="margin-top:22px">Source: <code class="ip">eval/results.json</code> · full write-up in
+    <code class="ip">eval/results.md</code> · regenerate with <code class="ip">make eval</code>. Reproducible:
+    temperature 0, fixed KB, deterministic router + stratified folds.</p>
+{% endif %}
+{% endblock %}

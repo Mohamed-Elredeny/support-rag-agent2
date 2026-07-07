@@ -6,6 +6,7 @@ top of this in later steps.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -16,9 +17,18 @@ from app import kb, storage
 from app.agent import SupportAgent
 from app.retriever import InMemoryRetriever
 
-_TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
+_ROOT = Path(__file__).resolve().parent.parent
+_TEMPLATES = Jinja2Templates(directory=str(_ROOT / "templates"))
+_EVAL_JSON = _ROOT / "eval" / "results.json"
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _load_eval() -> dict | None:
+    """The offline eval report (eval/results.json), or None if it hasn't been generated."""
+    if _EVAL_JSON.exists():
+        return json.loads(_EVAL_JSON.read_text(encoding="utf-8"))
+    return None
 
 
 @router.get("", response_class=HTMLResponse)
@@ -30,7 +40,17 @@ def dashboard(request: Request) -> HTMLResponse:
             "active": "dashboard",
             "counts": storage.dashboard_counts(),
             "recent": storage.list_tickets()[:5],
+            "eval": _load_eval(),
         },
+    )
+
+
+@router.get("/eval", response_class=HTMLResponse)
+def evaluation(request: Request) -> HTMLResponse:
+    """Render the offline eval report (eval/results.json). Regenerate with `make eval`."""
+    return _TEMPLATES.TemplateResponse(
+        "admin/eval.html",
+        {"request": request, "active": "eval", "data": _load_eval()},
     )
 
 

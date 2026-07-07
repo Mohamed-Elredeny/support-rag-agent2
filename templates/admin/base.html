@@ -174,6 +174,36 @@
     .btn.danger:hover { border-color: var(--decline); }
     .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 
+    /* ---------- evaluation page ---------- */
+    .card .sub { color: var(--muted); font-size: 11.5px; margin-top: 7px; }
+    .card .big { font-size: 34px; font-weight: 730; letter-spacing: -.02em; }
+    .card.hero::before { width: 4px; }
+    .card.hero .big { color: var(--accent); }
+    .bar { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-top: 9px; }
+    .bar > i { display: block; height: 100%; border-radius: 99px;
+               background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+    .verdict { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+               border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--shadow); }
+    .verdict.good { border-left-color: var(--answer); }
+    .verdict h3 { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 9px; }
+    .verdict h3 .tag { font-size: 11.5px; font-weight: 650; padding: 3px 10px; border-radius: 999px;
+                       color: var(--answer); background: color-mix(in srgb, var(--answer) 14%, transparent);
+                       border: 1px solid color-mix(in srgb, var(--answer) 35%, transparent); }
+    .verdict p { margin: 8px 0; color: var(--text); line-height: 1.6; }
+    .verdict ul { margin: 10px 0 0; padding-left: 20px; }
+    .verdict li { margin: 6px 0; line-height: 1.55; }
+    .verdict .good-txt { color: var(--answer); font-weight: 650; }
+    .verdict .warn-txt { color: var(--clarify); font-weight: 650; }
+    .section-note { color: var(--muted); font-size: 13px; margin: -4px 0 16px; max-width: 720px; line-height: 1.55; }
+    table.cm td.num { text-align: center; font-variant-numeric: tabular-nums; }
+    table.cm td.diag { background: color-mix(in srgb, var(--answer) 16%, transparent);
+                       color: var(--answer); font-weight: 720; }
+    table.cm td.err { background: color-mix(in srgb, var(--decline) 13%, transparent);
+                      color: var(--decline); font-weight: 680; }
+    table.cm td.zero { color: var(--muted); }
+    .pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .mono { font-family: var(--mono); font-size: 13px; }
+
     /* ---------- responsive ---------- */
     @media (max-width: 820px) {
       .layout { flex-direction: column; }
@@ -211,6 +241,9 @@
         <a href="/admin/kb" class="{{ 'active' if active == 'kb' else '' }}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
           <span>Knowledge Base</span></a>
+        <a href="/admin/eval" class="{{ 'active' if active == 'eval' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          <span>Evaluation</span></a>
       </nav>
       <div class="side-foot">
         <a href="/" title="Open the chat">
