@@ -17,7 +17,7 @@
     <tr>
       <td><a href="/admin/tickets/{{ t.id }}">{{ t.id }}</a></td>
       <td><a href="/admin/tickets/{{ t.id }}">{{ t.question[:70] }}{% if t.question|length > 70 %}…{% endif %}</a></td>
-      <td class="muted">{{ t.decision }}</td>
+      <td><span class="badge {{ t.decision }}">{{ t.decision }}</span></td>
       <td>{{ t.channel }}</td>
       <td><span class="badge {{ t.status }}">{{ t.status }}</span></td>
       <td class="muted">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
