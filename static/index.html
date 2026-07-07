@@ -1,83 +1,375 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agentic Support Assistant</title>
+  <title>Support Assistant</title>
   <style>
-    :root { --bg:#0f1419; --panel:#1a212b; --muted:#8a97a8; --accent:#4f9cf9; }
+    :root {
+      --accent: #6366f1;
+      --accent-2: #3b82f6;
+      --accent-contrast: #ffffff;
+      --answer: #16a34a; --clarify: #d97706; --decline: #dc2626;
+      --radius: 16px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0b0f14; --surface: #111820; --surface-2: #1a222c; --surface-3: #232c38;
+      --text: #e8eef5; --muted: #8a97a8; --border: #232c38; --border-2: #2b3543;
+      --user-text: #ffffff;
+      --shadow: 0 20px 50px -20px rgba(0,0,0,.7);
+      --bot-bubble: #1a222c;
+    }
+    :root[data-theme="light"] {
+      --bg: #eef1f6; --surface: #ffffff; --surface-2: #f5f7fa; --surface-3: #eef1f6;
+      --text: #0f1722; --muted: #64748b; --border: #e4e9f0; --border-2: #d7dee8;
+      --user-text: #ffffff;
+      --shadow: 0 20px 50px -24px rgba(15,23,42,.25);
+      --bot-bubble: #f2f5f9;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:#e6edf3; }
-    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
-    h1 { font-size: 1.25rem; margin: 0 0 4px; }
-    .sub { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
-    #log { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
-    .msg { padding:10px 12px; border-radius:10px; max-width:85%; white-space:pre-wrap; }
-    .user { align-self:flex-end; background:var(--accent); color:#04101f; }
-    .bot { align-self:flex-start; background:var(--panel); }
-    .trace { font-size:.72rem; color:var(--muted); margin-top:6px; }
-    .badge { display:inline-block; padding:1px 7px; border-radius:99px; font-size:.7rem; font-weight:600; }
-    .answer { background:#1f6f3f; } .clarify { background:#8a6d1f; } .decline { background:#8a2f2f; }
-    form { display:flex; gap:8px; }
-    input { flex:1; padding:11px 12px; border-radius:10px; border:1px solid #2b3543; background:#0b0f14; color:#e6edf3; }
-    button { padding:0 18px; border:0; border-radius:10px; background:var(--accent); color:#04101f; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:default; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: var(--font); background: var(--bg); color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---------- app shell ---------- */
+    .app {
+      width: min(860px, 100%); height: min(920px, 100dvh);
+      display: flex; flex-direction: column;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; overflow: hidden; box-shadow: var(--shadow);
+    }
+    @media (max-width: 720px) { .app { height: 100dvh; border-radius: 0; border: none; } body { align-items: stretch; } }
+
+    /* ---------- header ---------- */
+    header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: var(--surface); position: relative; z-index: 2;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .logo {
+      width: 40px; height: 40px; border-radius: 12px; flex: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center; color: #fff;
+      box-shadow: 0 6px 16px -6px var(--accent);
+    }
+    .brand-txt { min-width: 0; }
+    .brand-txt h1 { font-size: 1rem; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+    .status { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); margin-top: 2px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--answer); box-shadow: 0 0 0 0 rgba(22,163,74,.5); animation: pulse 2.4s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.5); } 70% { box-shadow: 0 0 0 7px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+    .actions { margin-left: auto; display: flex; gap: 6px; }
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border-2);
+      background: var(--surface-2); color: var(--muted); cursor: pointer;
+      display: grid; place-items: center; transition: .15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    /* ---------- messages ---------- */
+    .messages { flex: 1; overflow-y: auto; padding: 22px 18px 8px; scroll-behavior: smooth; }
+    .messages::-webkit-scrollbar { width: 10px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; border: 3px solid var(--surface); }
+
+    .row { display: flex; gap: 10px; margin-bottom: 18px; animation: rise .28s cubic-bezier(.2,.7,.3,1); }
+    .row.user { flex-direction: row-reverse; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .avatar { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-size: .8rem; }
+    .avatar.bot { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+    .avatar.user { background: var(--surface-3); color: var(--muted); }
+    .stack { display: flex; flex-direction: column; max-width: 78%; min-width: 0; }
+    .row.user .stack { align-items: flex-end; }
+
+    .bubble {
+      padding: 11px 14px; border-radius: 14px; line-height: 1.5; font-size: .93rem;
+      white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+    }
+    .bot .bubble { background: var(--bot-bubble); border: 1px solid var(--border); border-top-left-radius: 5px; }
+    .user .bubble { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--user-text); border-top-right-radius: 5px; }
+    .bubble.error { background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.4); color: var(--decline); }
+
+    /* decision badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+      padding: 3px 9px 3px 7px; border-radius: 99px; font-size: .7rem; font-weight: 650;
+      text-transform: capitalize; margin-bottom: 7px; border: 1px solid transparent;
+    }
+    .badge svg { width: 12px; height: 12px; }
+    .badge.answer  { color: var(--answer);  background: color-mix(in srgb, var(--answer) 14%, transparent);  border-color: color-mix(in srgb, var(--answer) 35%, transparent); }
+    .badge.clarify { color: var(--clarify); background: color-mix(in srgb, var(--clarify) 14%, transparent); border-color: color-mix(in srgb, var(--clarify) 35%, transparent); }
+    .badge.decline { color: var(--decline); background: color-mix(in srgb, var(--decline) 14%, transparent); border-color: color-mix(in srgb, var(--decline) 35%, transparent); }
+
+    /* sources + trace */
+    .meta { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .chip {
+      font-size: .72rem; color: var(--muted); background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .chip b { color: var(--text); font-weight: 600; }
+    details.trace { font-size: .72rem; margin-top: 2px; width: 100%; }
+    details.trace summary { color: var(--muted); cursor: pointer; list-style: none; user-select: none; display: inline-flex; align-items: center; gap: 4px; }
+    details.trace summary::-webkit-details-marker { display: none; }
+    details.trace summary::before { content: "▸"; font-size: .6rem; transition: transform .15s; }
+    details.trace[open] summary::before { transform: rotate(90deg); }
+    .trace-grid { margin-top: 7px; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-family: var(--mono); color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+    .trace-grid span:nth-child(odd) { color: var(--muted); }
+    .trace-grid span:nth-child(even) { color: var(--text); text-align: right; }
+
+    /* typing indicator */
+    .typing { display: flex; gap: 4px; padding: 4px 2px; }
+    .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+    .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+    /* ---------- empty state ---------- */
+    .welcome { text-align: center; padding: 34px 20px 10px; }
+    .welcome .logo { width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px; }
+    .welcome .logo svg { width: 28px; height: 28px; }
+    .welcome h2 { margin: 0 0 6px; font-size: 1.25rem; letter-spacing: -.02em; }
+    .welcome p { margin: 0 auto; color: var(--muted); font-size: .9rem; max-width: 420px; line-height: 1.55; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 22px; }
+    .suggest {
+      border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text);
+      padding: 9px 14px; border-radius: 99px; font-size: .82rem; cursor: pointer;
+      font-family: inherit; transition: .15s;
+    }
+    .suggest:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+    /* ---------- composer ---------- */
+    .composer { padding: 12px 16px 16px; border-top: 1px solid var(--border); background: var(--surface); }
+    .field {
+      display: flex; align-items: flex-end; gap: 8px; background: var(--surface-2);
+      border: 1px solid var(--border-2); border-radius: 16px; padding: 7px 7px 7px 15px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+    textarea {
+      flex: 1; border: 0; background: transparent; color: var(--text); resize: none;
+      font-family: inherit; font-size: .93rem; line-height: 1.5; padding: 6px 0;
+      max-height: 140px; outline: none;
+    }
+    textarea::placeholder { color: var(--muted); }
+    .send {
+      width: 38px; height: 38px; flex: none; border: 0; border-radius: 12px; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+      display: grid; place-items: center; transition: .15s;
+    }
+    .send:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+    .send:disabled { opacity: .45; cursor: default; }
+    .hint { text-align: center; color: var(--muted); font-size: .7rem; margin-top: 9px; }
+    .hint kbd { font-family: var(--mono); background: var(--surface-3); border: 1px solid var(--border-2); border-radius: 4px; padding: 0 5px; font-size: .68rem; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Agentic Support Assistant</h1>
-    <div class="sub">Ask about your account, billing, integrations, or data &amp; security. The agent will answer, ask a clarifying question, or decline.</div>
-    <div id="log"></div>
-    <form id="form">
-      <input id="q" autocomplete="off" placeholder="e.g. I forgot my login, how do I get back in?" />
-      <button id="send" type="submit">Send</button>
-    </form>
-  </div>
+  <main class="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 3a9 9 0 0 0-9 9v4a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H5a7 7 0 0 1 14 0h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-4a9 9 0 0 0-9-9Z" fill="currentColor"/></svg>
+        </div>
+        <div class="brand-txt">
+          <h1>Support Assistant</h1>
+          <div class="status"><span class="dot"></span> Online · Account, Billing, Integrations, Data &amp; Security</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle theme">
+          <svg class="ic-moon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          <svg class="ic-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="icon-btn" id="clear" title="New conversation" aria-label="New conversation">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation"></div>
+
+    <div class="composer">
+      <form class="field" id="form">
+        <textarea id="input" rows="1" autocomplete="off" placeholder="Ask about your account, billing, integrations…" aria-label="Message"></textarea>
+        <button class="send" id="send" type="submit" aria-label="Send message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3 10l12 2-12 2 .4 6.4Z"/></svg>
+        </button>
+      </form>
+      <div class="hint"><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</div>
+    </div>
+  </main>
+
   <script>
-    const log = document.getElementById("log");
+    const messages = document.getElementById("messages");
     const form = document.getElementById("form");
-    const input = document.getElementById("q");
+    const input = document.getElementById("input");
     const send = document.getElementById("send");
 
-    function add(text, who) {
-      const el = document.createElement("div");
-      el.className = "msg " + who;
-      el.textContent = text;
-      log.appendChild(el);
-      el.scrollIntoView();
-      return el;
+    const SUGGESTIONS = [
+      "How do I reset my password?",
+      "What payment methods do you accept?",
+      "Does it integrate with Slack and Jira?",
+      "How do I export all my data?",
+    ];
+
+    const ICONS = {
+      answer:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+      clarify: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18h2v-2h-2v2Zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8ZM12 6a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4Z"/></svg>',
+      decline: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 0 1-6.32-12.9L16.9 18.32A7.94 7.94 0 0 1 12 20Zm6.32-3.1L7.1 5.68A8 8 0 0 1 18.32 16.9Z"/></svg>',
+    };
+
+    /* ---------- theme ---------- */
+    const root = document.documentElement;
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) root.setAttribute("data-theme", savedTheme);
+    function syncThemeIcon() {
+      const dark = root.getAttribute("data-theme") === "dark";
+      document.querySelector(".ic-moon").style.display = dark ? "" : "none";
+      document.querySelector(".ic-sun").style.display = dark ? "none" : "";
+    }
+    syncThemeIcon();
+    document.getElementById("theme").addEventListener("click", () => {
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      syncThemeIcon();
+    });
+
+    /* ---------- welcome / empty state ---------- */
+    function showWelcome() {
+      messages.innerHTML = `
+        <div class="welcome">
+          <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-9 9v4a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H5a7 7 0 0 1 14 0h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-4a9 9 0 0 0-9-9Z"/></svg></div>
+          <h2>How can I help you today?</h2>
+          <p>I answer questions about your account, billing, integrations, and data &amp; security — and I'll ask for clarification or decline politely when something's outside my scope.</p>
+          <div class="suggestions"></div>
+        </div>`;
+      const box = messages.querySelector(".suggestions");
+      SUGGESTIONS.forEach(s => {
+        const b = document.createElement("button");
+        b.className = "suggest"; b.type = "button"; b.textContent = s;
+        b.addEventListener("click", () => { ask(s); });
+        box.appendChild(b);
+      });
     }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const question = input.value.trim();
-      if (!question) return;
-      add(question, "user");
-      input.value = "";
-      send.disabled = true;
-      const thinking = add("…", "bot");
+    /* ---------- rendering ---------- */
+    function scrollDown() { messages.scrollTop = messages.scrollHeight; }
+
+    function addRow(who) {
+      if (messages.querySelector(".welcome")) messages.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "row " + who;
+      const avatar = document.createElement("div");
+      avatar.className = "avatar " + who;
+      avatar.innerHTML = who === "bot"
+        ? '<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2v1h3a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-3l-4 3v-3H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3V4a2 2 0 0 1 2-2ZM9 11a1 1 0 1 0 1 1 1 1 0 0 0-1-1Zm6 0a1 1 0 1 0 1 1 1 1 0 0 0-1-1Z"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4 0-8 2-8 5v1h16v-1c0-3-4-5-8-5Z"/></svg>';
+      const stack = document.createElement("div");
+      stack.className = "stack";
+      row.appendChild(avatar); row.appendChild(stack);
+      messages.appendChild(row);
+      return stack;
+    }
+
+    function userBubble(text) {
+      const stack = addRow("user");
+      const b = document.createElement("div");
+      b.className = "bubble"; b.textContent = text;
+      stack.appendChild(b);
+      scrollDown();
+    }
+
+    function typingBubble() {
+      const stack = addRow("bot");
+      const b = document.createElement("div");
+      b.className = "bubble";
+      b.innerHTML = '<div class="typing"><i></i><i></i><i></i></div>';
+      stack.appendChild(b);
+      scrollDown();
+      return { stack, bubble: b };
+    }
+
+    function num(x) { return (x === null || x === undefined) ? "—" : x; }
+
+    function renderAnswer(stack, bubble, data) {
+      bubble.innerHTML = "";
+      const badge = document.createElement("span");
+      badge.className = "badge " + data.decision;
+      badge.innerHTML = (ICONS[data.decision] || "") + "<span>" + data.decision + "</span>";
+      const text = document.createElement("div");
+      text.textContent = data.answer;
+      bubble.appendChild(badge); bubble.appendChild(text);
+
+      const src = (data.sources && data.sources[0]) || null;
+      const s = data.scores || {};
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      if (src) {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.innerHTML = 'Source <b>' + src.id + '</b> · ' + src.category;
+        meta.appendChild(chip);
+      }
+      const details = document.createElement("details");
+      details.className = "trace";
+      details.innerHTML =
+        '<summary>decision trace</summary>' +
+        '<div class="trace-grid">' +
+        '<span>top-1 similarity</span><span>' + num(s.top1) + '</span>' +
+        '<span>margin (top1−top2)</span><span>' + num(s.margin) + '</span>' +
+        '<span>latency</span><span>' + num(data.latency_ms) + ' ms</span>' +
+        '<span>model</span><span>' + num(data.model) + '</span>' +
+        '</div>';
+      meta.appendChild(details);
+      stack.appendChild(meta);
+      scrollDown();
+    }
+
+    /* ---------- send flow ---------- */
+    let pending = false;
+    async function ask(question) {
+      question = (question || "").trim();
+      if (!question || pending) return;
+      pending = true; send.disabled = true;
+      userBubble(question);
+      input.value = ""; autosize();
+      const { stack, bubble } = typingBubble();
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question }),
         });
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
-        thinking.textContent = data.answer;
-        const trace = document.createElement("div");
-        trace.className = "trace";
-        const s = data.scores || {};
-        trace.innerHTML = `<span class="badge ${data.decision}">${data.decision}</span> ` +
-          `top1=${s.top1} margin=${s.margin} · source=${(data.sources[0]||{}).id || "—"} · ${data.latency_ms}ms`;
-        thinking.appendChild(trace);
+        renderAnswer(stack, bubble, data);
       } catch (err) {
-        thinking.textContent = "Request failed: " + err;
+        bubble.className = "bubble error";
+        bubble.textContent = "Couldn't reach the assistant (" + err.message + "). Please try again.";
       } finally {
-        send.disabled = false;
-        input.focus();
+        pending = false; send.disabled = false; input.focus();
       }
+    }
+
+    form.addEventListener("submit", (e) => { e.preventDefault(); ask(input.value); });
+
+    /* Enter to send, Shift+Enter for newline */
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
     });
+
+    /* auto-grow textarea */
+    function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; }
+    input.addEventListener("input", autosize);
+
+    document.getElementById("clear").addEventListener("click", () => { showWelcome(); input.focus(); });
+
+    showWelcome();
+    input.focus();
   </script>
 </body>
 </html>
